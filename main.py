@@ -1,3 +1,29 @@
+from mini_npu_simulator import MiniNPUSimulator
+
+def test_main():
+    """  
+    테스트를 위한 함수
+    """
+
+    size = 3
+    pattern = [
+        [1, 1, 1], 
+        [1, 1, 1], 
+        [1, 1, 1]
+        ]
+    filter = [
+        [0, 1, 0], 
+        [1, 1, 1], 
+        [0, 1, 0]
+        ]
+
+    mini_npu_simulator = MiniNPUSimulator
+    mac = mini_npu_simulator.calculate_mac(size, pattern, filter)
+
+    print(mac)
+
+
+
 def main():
 
     # 인스턴스 생성하기
@@ -5,7 +31,7 @@ def main():
     try:
         # 인스턴스 실행하기
         # 오류 방지를 위한 임의 코드(완성후 삭제)
-        1 + 1
+        pass
 
     except KeyboardInterrupt:
         print("\n사용자 요청으로 프로그램을 종료합니다.")
@@ -16,7 +42,7 @@ def main():
     finally:
         # 인스턴스 실행중 오류 발생시 대처방안
         # 오류 방지를 위한 임의 코드(완성후 삭제)
-        1 + 1
+        pass
 
 
 if __name__ == "__main__":
@@ -24,4 +50,5 @@ if __name__ == "__main__":
     해당 파일이 직접 실행될때만 main 함수가 작동하도록 처리
     다른 파일에서 import 해도 해당 함수는 실행되지 않음
     """
-    main()
+    # main()
+    test_main()
