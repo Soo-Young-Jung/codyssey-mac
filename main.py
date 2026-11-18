@@ -5,22 +5,25 @@ def test_main():
     테스트를 위한 함수
     """
 
-    size = 3
-    pattern = [
-        [1, 1, 1], 
-        [1, 1, 1], 
-        [1, 1, 1]
-        ]
-    filter = [
-        [0, 1, 0], 
-        [1, 1, 1], 
-        [0, 1, 0]
-        ]
+    # pattern = [
+    #     [1, 1, 1], 
+    #     [1, 1, 1], 
+    #     [1, 1, 1]
+    #     ]
+    # filter = [
+    #     [0, 1, 0], 
+    #     [1, 1, 1], 
+    #     [0, 1, 0]
+    #     ]
 
-    mini_npu_simulator = MiniNPUSimulator
-    mac = mini_npu_simulator.calculate_mac(size, pattern, filter)
+    # mini_npu_simulator = MiniNPUSimulator
+    # mac = mini_npu_simulator.calculate_mac(pattern, filter)
 
-    print(mac)
+    # print(mac)
+
+    # 1. 객체 생성
+    simulator = MiniNPUSimulator()
+    simulator.run_manual_mode()
 
 
 
