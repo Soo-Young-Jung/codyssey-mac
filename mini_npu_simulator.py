@@ -1,3 +1,4 @@
+import json
 import math
 import time
 
@@ -15,11 +16,25 @@ class MiniNPUSimulator:
         self.min_iter = 10
 
 
-    def normalize_label():
+    def normalize_label(self, label):
         """  
         입력 라벨을 표준 형식으로 변환
         """
-        pass
+        if not isinstance(label, str):
+            return None
+
+        label = label.strip().lower()
+
+        label_mapping = {
+            "+": "Cross",
+            "cross": "Cross",
+            "a": "Cross",
+            "x": "X",
+            "b": "X",
+            "undecided":"UNDECIDED"
+        }
+
+        return label_mapping.get(label)
 
     def validate_matrix(self, matrix, size):
         """  
@@ -123,7 +138,6 @@ class MiniNPUSimulator:
             "score_b": filter_b_mac,
             "average_time": average_time,
             "result": result
-
         }
 
 
@@ -216,17 +230,141 @@ class MiniNPUSimulator:
         return matrix
 
 
-    def load_json_data():
-        """  
-        data.json 파일 읽기
+    def load_json_data(self):
+        """ 
+        JSON 파일에서 퀴즈 데이터를 불러오는 메서드
+        파일이 손상되었거나 읽기/쓰기 오류가 발생한 경우를 try/except 로 처리한다.
         """
-        pass
+        try:
+            with open("data.json", "r", encoding="utf-8") as file:
+                data = json.load(file)
+                return data
+        except json.JSONDecodeError:
+            print("데이터 파일이 손상되었습니다.")
 
-    def run_json_test_mode():
+        except OSError as error:
+            print(f"데이터 파일을 읽을 수 없습니다: {error}")
+
+    def run_json_test_mode(self):
         """  
         JSON 데이터의 전체 테스트 수행
         """
-        pass
+
+        # JSON 데이터 로드
+        print("==== JSON 데이터를 로드 합니다. ====")
+        json_data = self.load_json_data()
+
+        # 필터 데이터
+        filters_data = json_data['filters']
+        # 패턴 데이터
+        patterns_data = json_data['patterns']
+
+        mac_result_list = []
+
+        # 패턴을 기준으로 반복문 실행
+        for pattern_key in patterns_data:
+
+            pattern_key_list = pattern_key.split("_")
+
+            # 패턴의 키값을 _ 기준으로 나눈 뒤 0과 1번 인덱스를 합쳐 필터의 키값 생성
+            filters_key = pattern_key_list[0] + "_" + pattern_key_list[1]
+            # 필터 리스트를 가져온다
+            filters = filters_data[filters_key]
+            # + 필터
+            filter_cross = filters['cross']
+            # x 필터
+            filter_x = filters['x']
+
+            # MAC 연산을 돌릴 패턴
+            pattern = patterns_data[pattern_key]['input']
+            # 기대값
+            expected = patterns_data[pattern_key]['expected']
+            # 정규화 된 기대값
+            normalize_expected = self.normalize_label(expected)
+
+            # MAC 연산에 대한 
+            mac_result = {
+                "test_name": pattern_key,
+                "size": pattern_key_list[1],
+                "filter_cross_score": 0,
+                "filter_x_score": 0,
+                "expected": normalize_expected,
+                "average_time": 0,
+                "actual":"",
+                "result": "",
+                "reason": ""
+            }
+
+            # 행렬 유효성 검사
+            json_test_validate_matrix = self.json_test_validate_matrix(filter_cross, filter_x, pattern, pattern_key_list[1])
+
+            # 행열이 유효하지 않은 경우 continue
+            if(json_test_validate_matrix['valid']):
+                mac_result['result'] = "FAIL"
+                mac_result['reason'] = json_test_validate_matrix['reasons']
+                mac_result_list.append(mac_result)
+                continue
+
+            # MAC 연산 및 판정
+            classify_pattern = self.classify_pattern(filter_cross, filter_x, pattern)
+
+            normalize_actual = self.normalize_label(classify_pattern['result'])
+
+            mac_result['filter_cross_score'] = classify_pattern['score_a']
+            mac_result['filter_x_score'] = classify_pattern['score_b']
+            mac_result['average_time'] = classify_pattern['average_time']
+            mac_result['actual'] = normalize_actual
+
+            # MAC 연산결과 판정
+            if(normalize_actual == normalize_expected):
+                mac_result['result'] = "PASS"
+            else:
+                mac_result['result'] = "FAIL"
+                mac_result['reason'] = "패턴불일치"
+                if(normalize_actual == "UNDECIDED"):
+                    mac_result['reason'] = "동점(UNDECIDED) 처리 규칙에 따라 FAIL"
+
+            mac_result_list.append(mac_result)
+
+        self.summarize_results(mac_result_list)
+
+
+
+            
+    def json_test_validate_matrix(self, filter_cross, filter_x, pattern, size):
+        """  
+        run_json_test_mode 메서드 내부에 필터와 패턴의 행열이 유효한지 검사
+        """
+        
+        validation = self.validate_matrix(filter_cross, size)
+
+        if(validation['valid']):
+            return {
+                "valid": True,
+                "reasons": "+ 필터 행열이 유효하지 않음."
+            }
+        
+        validation = self.validate_matrix(filter_x, size)
+
+        if(validation['valid']):
+            return {
+                "valid": True,
+                "reasons": "X 필터 행열이 유효하지 않음."
+            }
+        
+        validation = self.validate_matrix(pattern, size)
+
+        if(validation['valid']):
+            return {
+                "valid": True,
+                "reasons": "패턴 행열이 유효하지 않음."
+            }
+
+        return {
+            "valid": False,
+            "reasons": ""
+        }
+        
 
     def benchmark_mac(self, pattern, filter):
         """  
@@ -260,8 +398,61 @@ class MiniNPUSimulator:
         }
 
 
-    def summarize_results():
+    def summarize_results(self, mac_result_list):
         """  
         전체 테스트 결과 및 PASS/FAIL 집계
         """
-        pass
+        total_count = len(mac_result_list)
+        pass_count = 0
+        fail_count = 0
+        # 실패한 결과를 모아둔 리스트
+        fail_case_list = []
+        # 밴치마크한 결과를 요약하기 위한 딕셔너리
+        benchmark_list = {}
+
+
+        print("==== 패턴 분석 ====")
+        for mac_result in mac_result_list:
+
+            # 사이즈를 키값으로 각 사이즈별 키값이 있으면 경과 시간을 합산, 없으면 해당 키값을 생성
+            if mac_result['size'] in benchmark_list:
+                benchmark_list[mac_result['size']]['total_average_time'] += mac_result['average_time']
+                benchmark_list[mac_result['size']]['count'] += 1
+            else:
+                benchmark_list[mac_result['size']] = {
+                    "total_average_time":mac_result['average_time'],
+                    "count":1,
+                }
+
+            if mac_result["result"] == "PASS":
+                pass_count += 1
+            else:
+                fail_count += 1
+                fail_case_list.append(f"{mac_result['test_name']} : {mac_result['reason']}")
+
+            print(f"-- {mac_result['test_name']} --")
+            print(f"Cross 점수: {mac_result['filter_cross_score']}")
+            print(f"X 점수: {mac_result['filter_x_score']}")
+            print(f"판정: {mac_result['actual']} | expected: {mac_result['expected']} | {mac_result['result']}")
+
+
+        print(f"==== 성능분석(평균/{self.min_iter}회) ====")
+        print("크기\t평균 시간(ms)\t\t연산횟수")
+        for size, benchmark in benchmark_list.items():
+            # 평균 시간 = 각 케이스별 평균시간의 합산 / 전체 합산수
+            average_time = benchmark['total_average_time'] / benchmark['count']
+            # 연산 횟수 = 행열의 제곱
+            cal_count = int(size) ** 2
+            print(f"{size}x{size}\t{average_time}\t{cal_count}")
+
+
+        print("==== 결과 요약 ====")
+        print(f"총 테스트: {total_count}개")
+        print(f"통과: {pass_count}개")
+        print(f"실패: {fail_count}개")
+        print("")
+        print("실패 케이스")
+        
+        for fail_case in fail_case_list:
+            # 평균 시간 = 각 케이스별 평균시간의 합산 / 전체 합산수
+            print(fail_case)
